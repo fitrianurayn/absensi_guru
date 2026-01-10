@@ -1,22 +1,23 @@
 {
   "version": 2,
   "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
+  "installCommand": "npm install --prefix frontend && npm install --prefix backend",
   "public": "frontend/build",
   "functions": {
     "api/index.js": {
       "runtime": "nodejs18.x",
-      "memory": 512,
-      "maxDuration": 10
+      "memory": 1024,
+      "maxDuration": 30
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
+      "src": "/api(/.*)?",
+      "dest": "/api/index.js"
     },
     {
-      "source": "/(.*)",
-      "destination": "/frontend/build/index.html"
+      "src": "/(.*)",
+      "dest": "/frontend/build/index.html"
     }
   ]
 }

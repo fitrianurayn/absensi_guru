@@ -222,12 +222,14 @@ app.get("/api/rekap/:tahun/:bulan", async (req, res) => {
 });
 
 /* =======================
-   START SERVER (RAILWAY)
+   START SERVER (Development only)
 ======================= */
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Backend Absensi Guru running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend Absensi Guru running on port ${PORT}`);
+  });
+}
 
 // Export untuk Vercel (serverless)
 module.exports = app;
