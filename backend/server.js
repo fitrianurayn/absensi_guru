@@ -8,15 +8,17 @@ const app = express();
 /* =======================
    MIDDLEWARE
 ======================= */
-app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "absensi-guru-delta.vercel.app",
-    "https://*.vercel.app"
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "absensi-guru-delta.vercel.app",
+      "https://*.vercel.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.use(express.json());
 
@@ -226,3 +228,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend Absensi Guru running on port ${PORT}`);
 });
+
+// Export untuk Vercel (serverless)
+module.exports = app;
