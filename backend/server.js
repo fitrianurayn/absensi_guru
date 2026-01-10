@@ -9,9 +9,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Database connection
+// Database connection - VERSI AMAN ✅
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:admin@localhost:5432/absensi_guru'
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 // Test database connection
@@ -24,6 +27,7 @@ pool.connect((err, client, release) => {
   }
 });
 
+// ... sisa code Anda
 // Logging middleware
 app.use((req, res, next) => {
   console.log('API HIT:', req.method, req.url);
