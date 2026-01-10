@@ -1,7 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
-  "installCommand": "npm install --prefix frontend && npm install --prefix backend",
+  "buildCommand": "cd frontend && npm install && npm run build",
   "functions": {
     "api/index.js": {
       "runtime": "nodejs18.x",
