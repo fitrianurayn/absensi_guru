@@ -35,6 +35,7 @@ export default function Absensi() {
   console.log(`📅 Halaman Absensi: Bulan ${bulan} (${namaBulanIndonesia[bulan - 1]}) Tahun ${tahun}, ${jumlahHari} hari`);
 
   const API_URL = import.meta.env.VITE_API_URL;
+  
 
   const handleStatusHariChange = (hari, status) => {
     console.log(`🔄 Ubah status hari ${hari} → ${status}`);
