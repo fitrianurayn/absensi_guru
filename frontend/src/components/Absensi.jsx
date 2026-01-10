@@ -34,7 +34,13 @@ export default function Absensi() {
   
   console.log(`📅 Halaman Absensi: Bulan ${bulan} (${namaBulanIndonesia[bulan - 1]}) Tahun ${tahun}, ${jumlahHari} hari`);
 
-  const API_URL = 'http://localhost:5000';
+  // Dynamic API URL - localhost for dev, same origin for production (Vercel)
+  const API_URL = process.env.REACT_APP_API_URL || 
+    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+      ? 'http://localhost:5000' 
+      : `${window.location.origin}/api`);
+  
+  console.log('🔗 API URL:', API_URL);
 
   const handleStatusHariChange = (hari, status) => {
     console.log(`🔄 Ubah status hari ${hari} → ${status}`);
