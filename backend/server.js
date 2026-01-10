@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Database connection - VERSI AMAN ✅
+// Database connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -27,16 +27,14 @@ pool.connect((err, client, release) => {
   }
 });
 
-// ... sisa code Anda
 // Logging middleware
 app.use((req, res, next) => {
   console.log('API HIT:', req.method, req.url);
   next();
 });
 
-// ========== ROUTES ==========
+// ========== ROUTES ========== (semua route Anda tetap sama)
 
-// Get all guru
 app.get('/api/guru', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM guru ORDER BY nama');
@@ -47,10 +45,8 @@ app.get('/api/guru', async (req, res) => {
   }
 });
 
-// Add guru baru
 app.post('/api/guru', async (req, res) => {
   const { nama } = req.body;
-  
   try {
     const result = await pool.query(
       'INSERT INTO guru (nama) VALUES ($1) RETURNING *',
@@ -63,10 +59,8 @@ app.post('/api/guru', async (req, res) => {
   }
 });
 
-// Get status hari untuk bulan tertentu
 app.get('/api/status-hari/:tahun/:bulan', async (req, res) => {
   const { tahun, bulan } = req.params;
-  
   try {
     const result = await pool.query(
       'SELECT * FROM status_hari WHERE tahun = $1 AND bulan = $2 ORDER BY tanggal',
@@ -80,16 +74,12 @@ app.get('/api/status-hari/:tahun/:bulan', async (req, res) => {
   }
 });
 
-// Set status hari (aktif/hujan/libur) - SINGLE
 app.post('/api/status-hari', async (req, res) => {
   const { tahun, bulan, tanggal, status } = req.body;
-  
-  // Validasi status
   const statusUpper = status.toUpperCase();
   if (!['AKTIF', 'HUJAN', 'LIBUR'].includes(statusUpper)) {
     return res.status(400).json({ error: 'Status harus AKTIF, HUJAN, atau LIBUR' });
   }
-  
   try {
     const result = await pool.query(
       `INSERT INTO status_hari (tahun, bulan, tanggal, status) 
@@ -106,27 +96,18 @@ app.post('/api/status-hari', async (req, res) => {
   }
 });
 
-// Set status hari BULK (untuk simpan semua hari sekaligus)
 app.post("/api/status-hari/bulk", async (req, res) => {
   const { tahun, bulan, data } = req.body;
-  
   console.log(`📥 Menerima bulk status hari: tahun=${tahun}, bulan=${bulan}, jumlah=${data.length}`);
-  
   const client = await pool.connect();
-
   try {
     await client.query("BEGIN");
-
     for (const item of data) {
       const { tanggal, status } = item;
       const statusUpper = status.toUpperCase();
-      
-      // Validasi status
       if (!['AKTIF', 'HUJAN', 'LIBUR'].includes(statusUpper)) {
         throw new Error(`Status tidak valid: ${status}`);
       }
-
-      // Simpan status hari
       await client.query(
         `INSERT INTO status_hari (tahun, bulan, tanggal, status)
          VALUES ($1, $2, $3, $4)
@@ -134,18 +115,14 @@ app.post("/api/status-hari/bulk", async (req, res) => {
          DO UPDATE SET status = $4`,
         [tahun, bulan, tanggal, statusUpper]
       );
-
-      // Jika LIBUR atau HUJAN → hapus absensi
       if (statusUpper === 'LIBUR' || statusUpper === 'HUJAN') {
         const deleteResult = await client.query(
-          `DELETE FROM absensi
-           WHERE tahun = $1 AND bulan = $2 AND tanggal = $3`,
+          `DELETE FROM absensi WHERE tahun = $1 AND bulan = $2 AND tanggal = $3`,
           [tahun, bulan, tanggal]
         );
-        console.log(`  🗑️  Hapus ${deleteResult.rowCount} absensi untuk tanggal ${tanggal} (${statusUpper})`);
+        console.log(`🗑️ Hapus ${deleteResult.rowCount} absensi untuk tanggal ${tanggal} (${statusUpper})`);
       }
     }
-
     await client.query("COMMIT");
     console.log("✅ Bulk status hari berhasil disimpan");
     res.json({ message: "Status hari & absensi tersinkron", count: data.length });
@@ -158,10 +135,8 @@ app.post("/api/status-hari/bulk", async (req, res) => {
   }
 });
 
-// Get absensi untuk bulan tertentu
 app.get('/api/absensi/:tahun/:bulan', async (req, res) => {
   const { tahun, bulan } = req.params;
-  
   try {
     const result = await pool.query(
       'SELECT * FROM absensi WHERE tahun = $1 AND bulan = $2',
@@ -175,26 +150,17 @@ app.get('/api/absensi/:tahun/:bulan', async (req, res) => {
   }
 });
 
-// Simpan/update absensi
 app.post('/api/absensi', async (req, res) => {
   const { guru_id, tahun, bulan, tanggal, status } = req.body;
-  
   console.log(`📝 Simpan absensi: guru=${guru_id}, tanggal=${tanggal}, status=${status}`);
-
-  // Validasi status absensi
   if (!['H', 'I', 'S'].includes(status)) {
     return res.status(400).json({ error: 'Status harus H, I, atau S' });
   }
-
   try {
-    // Cek status hari
     const cekHari = await pool.query(
-      `SELECT status FROM status_hari 
-       WHERE tahun = $1 AND bulan = $2 AND tanggal = $3`,
+      `SELECT status FROM status_hari WHERE tahun = $1 AND bulan = $2 AND tanggal = $3`,
       [tahun, bulan, tanggal]
     );
-
-    // Jika ada status hari dan statusnya LIBUR/HUJAN, tolak
     if (cekHari.rows.length > 0) {
       const statusHari = cekHari.rows[0].status;
       if (statusHari === 'LIBUR' || statusHari === 'HUJAN') {
@@ -204,8 +170,6 @@ app.post('/api/absensi', async (req, res) => {
         });
       }
     }
-
-    // Simpan absensi
     const result = await pool.query(
       `INSERT INTO absensi (guru_id, tahun, bulan, tanggal, status) 
        VALUES ($1, $2, $3, $4, $5) 
@@ -214,7 +178,6 @@ app.post('/api/absensi', async (req, res) => {
        RETURNING *`,
       [guru_id, tahun, bulan, tanggal, status]
     );
-    
     console.log(`✅ Absensi tersimpan`);
     res.json(result.rows[0]);
   } catch (error) {
@@ -223,27 +186,20 @@ app.post('/api/absensi', async (req, res) => {
   }
 });
 
-// Rekap absensi per guru per bulan
 app.get('/api/rekap/:tahun/:bulan', async (req, res) => {
   const { tahun, bulan } = req.params;
-
   try {
     const result = await pool.query(`
       SELECT 
-        g.id AS guru_id,
-        g.nama,
+        g.id AS guru_id, g.nama,
         COUNT(CASE WHEN a.status = 'H' THEN 1 END) AS hadir,
         COUNT(CASE WHEN a.status = 'I' THEN 1 END) AS izin,
         COUNT(CASE WHEN a.status = 'S' THEN 1 END) AS sakit
       FROM guru g
-      LEFT JOIN absensi a 
-        ON g.id = a.guru_id 
-        AND a.tahun = $1 
-        AND a.bulan = $2
+      LEFT JOIN absensi a ON g.id = a.guru_id AND a.tahun = $1 AND a.bulan = $2
       GROUP BY g.id, g.nama
       ORDER BY g.nama
     `, [tahun, bulan]);
-
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching rekap:', err);
@@ -251,13 +207,9 @@ app.get('/api/rekap/:tahun/:bulan', async (req, res) => {
   }
 });
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+// Export untuk Vercel (serverless)
+module.exports = app;
