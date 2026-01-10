@@ -232,6 +232,7 @@ export default function Absensi() {
       .then(res => res.json())
       .then(data => setGuruList(data))
       .catch(err => console.error(err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -255,6 +256,7 @@ export default function Absensi() {
         console.log("✅ Loaded status hari:", data);
       })
       .catch(err => console.error(err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tahun, bulan, jumlahHari]);
 
   useEffect(() => {
