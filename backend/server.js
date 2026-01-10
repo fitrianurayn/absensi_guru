@@ -5,52 +5,35 @@ require("dotenv").config();
 
 const app = express();
 
-// Middleware
+/* =======================
+   MIDDLEWARE
+======================= */
 app.use(cors());
 app.use(express.json());
 
-// Database connection - support both mock (dev) dan real DB (production)
-let pool;
-
-if (process.env.MOCK_DB === "true") {
-  console.log("🧪 Running in MOCK mode (development)");
-  // Mock database - in-memory
-  pool = {
-    query: async (query, params) => {
-      console.log("📝 Mock Query:", query);
-      return { rows: [] };
-    },
-  };
-} else {
-  console.log("🗄️  Running with REAL database (production)");
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  });
-}
-
-// Test database connection
-if (process.env.MOCK_DB !== "true") {
-  pool.connect((err, client, release) => {
-    if (err) {
-      console.error("Error connecting to database:", err.stack);
-    } else {
-      console.log("Database connected successfully");
-      release();
-    }
-  });
-} else {
-  console.log("✅ Mock database ready");
-}
-
-// Logging middleware
 app.use((req, res, next) => {
   console.log("API HIT:", req.method, req.url);
   next();
 });
 
-// ========== ROUTES ========== (semua route Anda tetap sama)
+/* =======================
+   DATABASE (Supabase Postgres)
+======================= */
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
+/* =======================
+   HEALTH CHECK
+======================= */
+app.get("/health", (req, res) => {
+  res.json({ status: "OK", message: "Backend Absensi Guru Running" });
+});
+
+/* =======================
+   ROUTES GURU
+======================= */
 app.get("/api/guru", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM guru ORDER BY nama");
@@ -75,15 +58,15 @@ app.post("/api/guru", async (req, res) => {
   }
 });
 
+/* =======================
+   STATUS HARI
+======================= */
 app.get("/api/status-hari/:tahun/:bulan", async (req, res) => {
   const { tahun, bulan } = req.params;
   try {
     const result = await pool.query(
       "SELECT * FROM status_hari WHERE tahun = $1 AND bulan = $2 ORDER BY tanggal",
       [tahun, bulan]
-    );
-    console.log(
-      `✅ Fetched ${result.rows.length} status hari for ${tahun}-${bulan}`
     );
     res.json(result.rows);
   } catch (error) {
@@ -95,17 +78,19 @@ app.get("/api/status-hari/:tahun/:bulan", async (req, res) => {
 app.post("/api/status-hari", async (req, res) => {
   const { tahun, bulan, tanggal, status } = req.body;
   const statusUpper = status.toUpperCase();
+
   if (!["AKTIF", "HUJAN", "LIBUR"].includes(statusUpper)) {
     return res
       .status(400)
       .json({ error: "Status harus AKTIF, HUJAN, atau LIBUR" });
   }
+
   try {
     const result = await pool.query(
-      `INSERT INTO status_hari (tahun, bulan, tanggal, status) 
-       VALUES ($1, $2, $3, $4) 
-       ON CONFLICT (tahun, bulan, tanggal) 
-       DO UPDATE SET status = $4 
+      `INSERT INTO status_hari (tahun, bulan, tanggal, status)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (tahun, bulan, tanggal)
+       DO UPDATE SET status = $4
        RETURNING *`,
       [tahun, bulan, tanggal, statusUpper]
     );
@@ -118,50 +103,49 @@ app.post("/api/status-hari", async (req, res) => {
 
 app.post("/api/status-hari/bulk", async (req, res) => {
   const { tahun, bulan, data } = req.body;
-  console.log(
-    `📥 Menerima bulk status hari: tahun=${tahun}, bulan=${bulan}, jumlah=${data.length}`
-  );
   const client = await pool.connect();
+
   try {
     await client.query("BEGIN");
+
     for (const item of data) {
-      const { tanggal, status } = item;
-      const statusUpper = status.toUpperCase();
+      const statusUpper = item.status.toUpperCase();
+
       if (!["AKTIF", "HUJAN", "LIBUR"].includes(statusUpper)) {
-        throw new Error(`Status tidak valid: ${status}`);
+        throw new Error("Status tidak valid");
       }
+
       await client.query(
         `INSERT INTO status_hari (tahun, bulan, tanggal, status)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (tahun, bulan, tanggal)
          DO UPDATE SET status = $4`,
-        [tahun, bulan, tanggal, statusUpper]
+        [tahun, bulan, item.tanggal, statusUpper]
       );
-      if (statusUpper === "LIBUR" || statusUpper === "HUJAN") {
-        const deleteResult = await client.query(
-          `DELETE FROM absensi WHERE tahun = $1 AND bulan = $2 AND tanggal = $3`,
-          [tahun, bulan, tanggal]
-        );
-        console.log(
-          `🗑️ Hapus ${deleteResult.rowCount} absensi untuk tanggal ${tanggal} (${statusUpper})`
+
+      if (["LIBUR", "HUJAN"].includes(statusUpper)) {
+        await client.query(
+          `DELETE FROM absensi
+           WHERE tahun = $1 AND bulan = $2 AND tanggal = $3`,
+          [tahun, bulan, item.tanggal]
         );
       }
     }
+
     await client.query("COMMIT");
-    console.log("✅ Bulk status hari berhasil disimpan");
-    res.json({
-      message: "Status hari & absensi tersinkron",
-      count: data.length,
-    });
+    res.json({ message: "Bulk status hari berhasil" });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("❌ Error bulk status hari:", err);
-    res.status(500).json({ error: "Gagal simpan status hari: " + err.message });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   } finally {
     client.release();
   }
 });
 
+/* =======================
+   ABSENSI
+======================= */
 app.get("/api/absensi/:tahun/:bulan", async (req, res) => {
   const { tahun, bulan } = req.params;
   try {
@@ -169,54 +153,37 @@ app.get("/api/absensi/:tahun/:bulan", async (req, res) => {
       "SELECT * FROM absensi WHERE tahun = $1 AND bulan = $2",
       [tahun, bulan]
     );
-    console.log(
-      `✅ Fetched ${result.rows.length} absensi for ${tahun}-${bulan}`
-    );
     res.json(result.rows);
   } catch (error) {
-    console.error("Error fetching absensi:", error);
     res.status(500).json({ error: "Error fetching absensi" });
   }
 });
 
 app.post("/api/absensi", async (req, res) => {
   const { guru_id, tahun, bulan, tanggal, status } = req.body;
-  console.log(
-    `📝 Simpan absensi: guru=${guru_id}, tanggal=${tanggal}, status=${status}`
-  );
+
   if (!["H", "I", "S"].includes(status)) {
     return res.status(400).json({ error: "Status harus H, I, atau S" });
   }
+
   try {
-    const cekHari = await pool.query(
-      `SELECT status FROM status_hari WHERE tahun = $1 AND bulan = $2 AND tanggal = $3`,
-      [tahun, bulan, tanggal]
-    );
-    if (cekHari.rows.length > 0) {
-      const statusHari = cekHari.rows[0].status;
-      if (statusHari === "LIBUR" || statusHari === "HUJAN") {
-        console.log(`❌ Ditolak: hari ${tanggal} berstatus ${statusHari}`);
-        return res.status(400).json({
-          error: `Tidak bisa mengisi absensi di hari ${statusHari}`,
-        });
-      }
-    }
     const result = await pool.query(
-      `INSERT INTO absensi (guru_id, tahun, bulan, tanggal, status) 
-       VALUES ($1, $2, $3, $4, $5) 
-       ON CONFLICT (guru_id, tahun, bulan, tanggal) 
-       DO UPDATE SET status = $5 
+      `INSERT INTO absensi (guru_id, tahun, bulan, tanggal, status)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (guru_id, tahun, bulan, tanggal)
+       DO UPDATE SET status = $5
        RETURNING *`,
       [guru_id, tahun, bulan, tanggal, status]
     );
-    console.log(`✅ Absensi tersimpan`);
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error saving absensi:", error);
-    res.status(500).json({ error: "Error saving absensi: " + error.message });
+    res.status(500).json({ error: "Error saving absensi" });
   }
 });
 
+/* =======================
+   REKAP
+======================= */
 app.get("/api/rekap/:tahun/:bulan", async (req, res) => {
   const { tahun, bulan } = req.params;
   try {
@@ -228,30 +195,25 @@ app.get("/api/rekap/:tahun/:bulan", async (req, res) => {
         COUNT(CASE WHEN a.status = 'I' THEN 1 END) AS izin,
         COUNT(CASE WHEN a.status = 'S' THEN 1 END) AS sakit
       FROM guru g
-      LEFT JOIN absensi a ON g.id = a.guru_id AND a.tahun = $1 AND a.bulan = $2
+      LEFT JOIN absensi a
+        ON g.id = a.guru_id
+        AND a.tahun = $1
+        AND a.bulan = $2
       GROUP BY g.id, g.nama
       ORDER BY g.nama
-    `,
+      `,
       [tahun, bulan]
     );
     res.json(result.rows);
-  } catch (err) {
-    console.error("Error fetching rekap:", err);
+  } catch (error) {
     res.status(500).json({ error: "Gagal mengambil rekap absensi" });
   }
 });
 
-app.get("/health", (req, res) => {
-  res.json({ status: "OK", message: "Server is running" });
-});
-
-// Start server untuk development
+/* =======================
+   START SERVER (RAILWAY)
+======================= */
 const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`✅ Server running at http://localhost:${PORT}`);
-  });
-}
-
-// Export untuk Vercel (serverless)
-module.exports = app;
+app.listen(PORT, () => {
+  console.log(`🚀 Backend Absensi Guru running on port ${PORT}`);
+});
