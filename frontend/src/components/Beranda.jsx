@@ -153,13 +153,13 @@ export default function Beranda() {
             <span className="gradient-text">Selamat Datang</span>
           </h1>
           <p className="text-gray-600 text-sm sm:text-base md:text-lg px-4">
-            Pilih bulan untuk mengisi absensi guru
+            Absensi Ustad dan Ustadzah TPQ Baiturrahim
           </p>
           
           {/* Year Badge */}
           <div className="inline-flex items-center gap-2 mt-3 sm:mt-4 bg-[#ffb000] from-purple-500 to-blue-600 text-white px-4 sm:px-5 md:px-6 py-1.5 sm:py-2 rounded-full shadow-lg text-sm sm:text-base">
             <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="font-semibold">Tahun Ajaran 2026</span>
+            <span className="font-semibold">Tahun 2026</span>
           </div>
         </div>
 
