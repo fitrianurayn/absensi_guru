@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, Info } from 'lucide-react';
 
 export default function Beranda() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(false);
+  }, []);
 
   const namaBulan = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
+
 
   useEffect(() => {
     // Add stagger animation to buttons
@@ -22,7 +29,7 @@ export default function Beranda() {
     setLoading(true);
 
     const nomorBulan = index + 1;
-    window.location.href = `/absensi?bulan=${nomorBulan}&tahun=2026`;
+    navigate(`/absensi?bulan=${nomorBulan}&tahun=2026`);
   };
 
 
