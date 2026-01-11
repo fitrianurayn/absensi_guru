@@ -8,17 +8,10 @@ const app = express();
 /* =======================
    MIDDLEWARE
 ======================= */
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000",
-      "absensi-guru-delta.vercel.app",
-      "https://*.vercel.app",
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use(cors({
+  origin: "https://absensi-guru-delta.vercel.app"
+}));
+
 
 app.use(express.json());
 
