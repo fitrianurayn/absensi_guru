@@ -378,7 +378,7 @@ const API_URL = "https://absensiguru-production-2abf.up.railway.app";
                 {guruList.map((guru, idx) => (
                   <tr
                     key={guru.id}
-                    className={`${idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-purple-50 transition-all duration-200`}
+                    className={`${idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-blue-100 transition-all duration-200`}
                   >
                     <td
                       className="border border-gray-200 px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-700 sticky left-0 z-10 min-w-[100px] sm:min-w-[150px] text-xs sm:text-sm"
