@@ -34,7 +34,8 @@ export default function Absensi() {
   
   console.log(`📅 Halaman Absensi: Bulan ${bulan} (${namaBulanIndonesia[bulan - 1]}) Tahun ${tahun}, ${jumlahHari} hari`);
 
-const API_URL = "https://absensiguru-production-2abf.up.railway.app";
+  const API_URL = "https://absensiguru-production-2abf.up.railway.app";
+  
 
   const handleStatusHariChange = (hari, status) => {
     console.log(`🔄 Ubah status hari ${hari} → ${status}`);
@@ -63,97 +64,105 @@ const API_URL = "https://absensiguru-production-2abf.up.railway.app";
     setSudahDisimpan(false);
   };
 
-  const simpanPerubahan = async () => {
-    setIsLoading(true);
-    try {
-      if (Object.keys(statusHari).length === 0) {
-        alert("Data status hari belum dimuat.");
-        setIsLoading(false);
-        return;
-      }
+  const controllerRef = React.useRef(null);
 
-      console.log("Mulai simpan...");
+const simpanPerubahan = async () => {
+  if (controllerRef.current) {
+    controllerRef.current.abort(); // batalkan request lama
+  }
 
-      // Simpan status hari
-      const statusPayload = [];
-      for (let i = 1; i <= jumlahHari; i++) {
-        statusPayload.push({
-          tanggal: i,
-          status: statusHari[i] || "AKTIF"
-        });
-      }
+  const controller = new AbortController();
+  controllerRef.current = controller;
 
-      const statusRes = await fetch(`${API_URL}/api/status-hari/bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tahun, bulan, data: statusPayload })
+  setIsLoading(true);
+
+  try {
+    if (Object.keys(statusHari).length === 0) {
+      alert("Data status hari belum dimuat.");
+      return;
+    }
+
+    // === SIMPAN STATUS HARI ===
+    const statusPayload = [];
+    for (let i = 1; i <= jumlahHari; i++) {
+      statusPayload.push({
+        tanggal: i,
+        status: statusHari[i] || "AKTIF"
       });
+    }
 
-      if (!statusRes.ok) {
-        const errorData = await statusRes.json();
-        throw new Error(errorData.error || 'Gagal simpan status hari');
-      }
-      console.log("✅ Status hari tersimpan");
+    const statusRes = await fetch(`${API_URL}/api/status-hari/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tahun, bulan, data: statusPayload }),
+      signal: controller.signal
+    });
 
-      // Simpan absensi
-      const absensiPayload = [];
-      Object.keys(absensiData).forEach(key => {
-        const [guruId, hari] = key.split('-');
-        const hariNum = parseInt(hari);
-        const statusHariIni = statusHari[hariNum];
+    if (!statusRes.ok) {
+      throw new Error("Gagal simpan status hari");
+    }
 
-        if (!absensiData[key] || statusHariIni === "LIBUR" || statusHariIni === "HUJAN") {
-          return;
-        }
+    // === SIMPAN ABSENSI ===
+    for (const key of Object.keys(absensiData)) {
+      const [guruId, hari] = key.split("-");
+      const hariNum = Number(hari);
 
-        absensiPayload.push({
-          guru_id: parseInt(guruId),
+      if (
+        statusHari[hariNum] === "LIBUR" ||
+        statusHari[hariNum] === "HUJAN"
+      ) continue;
+
+      await fetch(`${API_URL}/api/absensi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guru_id: Number(guruId),
           tahun,
           bulan,
           tanggal: hariNum,
           status: absensiData[key]
-        });
+        }),
+        signal: controller.signal
       });
-
-      for (const item of absensiPayload) {
-        const res = await fetch(`${API_URL}/api/absensi`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item)
-        });
-        
-        if (!res.ok) {
-          const errorData = await res.json();
-          console.error('Error saving absensi:', errorData);
-        }
-      }
-      console.log("Absensi tersimpan");
-
-      await fetchAbsensi();
-      await loadRekap();
-
-      setSudahDisimpan(true);
-      setShowToast(true);
-      setAdaPerubahan(false);
-      setIsEditMode(false);
-      setTimeout(() => setShowToast(false), 3000);
-
-    } catch (err) {
-      console.error("❌ ERROR:", err);
-      alert(`Gagal menyimpan: ${err.message}`);
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    await fetchAbsensi();
+    await loadRekap();
+
+    setSudahDisimpan(true);
+    setAdaPerubahan(false);
+    setIsEditMode(false);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+
+  } catch (err) {
+    if (err.name === "AbortError") {
+      console.log("⛔ Simpan dibatalkan");
+    } else {
+      console.error(err);
+      alert("Gagal menyimpan data");
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handleKembali = (e) => {
     e.preventDefault();
+
+    if (isLoading) {
+      alert("Sedang menyimpan data, mohon tunggu...");
+      return;
+    }
+
     if (adaPerubahan && !sudahDisimpan) {
       setShowModal(true);
     } else {
       window.history.back();
     }
   };
+
 
   const renderKolomContent = (hari, guruId) => {
     const statusHariIni = statusHari[hari];
@@ -262,7 +271,10 @@ const API_URL = "https://absensiguru-production-2abf.up.railway.app";
       <div className="mb-4 sm:mb-6">
         <button
           onClick={handleKembali}
-          className="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-x-1"
+          disabled={isLoading}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm
+            ${isLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}
+          `}
         >
           <ArrowLeft className="w-4 h-4" />
           Kembali
@@ -435,6 +447,8 @@ const API_URL = "https://absensiguru-production-2abf.up.railway.app";
         </div>
       </div>
 
+      
+
       <div
         className={`fixed top-4 sm:top-6 right-4 sm:right-6 left-4 sm:left-auto bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-2xl shadow-2xl flex items-center gap-2 sm:gap-3 z-50 transition-all duration-300 ${
           showToast ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
@@ -465,7 +479,12 @@ const API_URL = "https://absensiguru-production-2abf.up.railway.app";
                 </button>
 
                 <button
-                  onClick={() => window.history.back()}
+                  onClick={() => {
+                    setIsLoading(false);
+                    setAdaPerubahan(false);
+                    setShowModal(false);
+                    window.history.back();
+                  }}
                   className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-semibold transition-all text-sm sm:text-base"
                 >
                   Ya, Kembali
