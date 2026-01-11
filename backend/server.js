@@ -1,7 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
-require("dotenv").config();
+console.log("DATABASE_URL:", process.env.DATABASE_URL ? "ADA" : "TIDAK ADA");
+
 
 const app = express();
 
@@ -14,6 +15,17 @@ app.use(cors({
 
 
 app.use(express.json());
+
+app.get("/db-test", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT NOW()");
+    res.json({ success: true, time: r.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 
 app.use((req, res, next) => {
   console.log("API HIT:", req.method, req.url);
