@@ -36,8 +36,6 @@ export default function Absensi() {
 
 const API_URL = "https://absensiguru-production-2abf.up.railway.app";
 
-  
-
   const handleStatusHariChange = (hari, status) => {
     console.log(`🔄 Ubah status hari ${hari} → ${status}`);
     setStatusHari(prev => ({ ...prev, [hari]: status }));
