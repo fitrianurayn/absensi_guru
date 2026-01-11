@@ -276,8 +276,7 @@ const API_URL = "https://absensiguru-production-2abf.up.railway.app";
             <span className="font-semibold text-base sm:text-lg">{namaBulanIndonesia[bulan - 1]}</span>
             <span className="font-semibold text-base sm:text-lg">{tahun}</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Absensi Ustad & Ustadzah</h1>
-          
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Absensi Ustad & Ustadzah TPQ Baiturrahim</h1>
         </div>
 
         <div className="mb-4 flex items-center justify-between gap-3">
